@@ -1,10 +1,9 @@
 project(event-client)
 
 add_executable(${PROJECT_NAME}
-	inc/client.hpp
-
+  inc/client.hpp
   src/client.cpp
-	src/main.cpp
+  src/main.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}
