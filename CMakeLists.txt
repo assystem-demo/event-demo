@@ -2,7 +2,8 @@ cmake_minimum_required (VERSION 3.4)
 
 project (EventDemo)
 
-find_package(Qt5 COMPONENTS Core Network REQUIRED)
+find_package(Qt5 COMPONENTS Core REQUIRED)
+find_package(Qt5 COMPONENTS Network REQUIRED)
 
 set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -O -Werror -Wall -fPIC ")
 set (CMAKE_CXX_STANDARD 14)
