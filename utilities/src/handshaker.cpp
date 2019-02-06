@@ -11,16 +11,38 @@ std::map<EventDemo::Handshaker::Type, QByteArray> names{
 
 QByteArray acceptMessage = "\x88";
 
+/*!
+ * \brief Represents a state in Handshake.
+ * This class represents a state in the handshake process.
+ * A state has an enter-state action (sending message or id), and an exit-state
+ * action (wait for incoming message from the other side of the connection, then
+ * compare it with an expected message or extract the id).
+ * An action can be empty.
+ */
 class HandshakeState : public QObject
 {
   Q_OBJECT
 public:
-  HandshakeState(QByteArray send, QByteArray receive);
-  void startWithWait(QTcpSocket* connection, uint8_t id);
-  void startWithSendForID(QTcpSocket* connection, uint8_t id);
-  void startWithSend(QTcpSocket* connection, uint8_t id);
-  void startWithSendId(QTcpSocket* connection, uint8_t id);
-  void sendonly(QTcpSocket* connection, uint8_t id);
+  enum class EnterAction
+  {
+    Empty,
+    SendMessage,
+    SendId
+  };
+
+  enum class ExitAction
+  {
+    Empty,
+    CompareMessage,
+    ExpectId
+  };
+
+  HandshakeState(EnterAction enter, ExitAction exit, QByteArray send, QByteArray receive);
+
+  void start(QTcpSocket* connection, uint8_t id);
+
+  void doCompare(QTcpSocket* connection, uint8_t id);
+  void doId(QTcpSocket* connection, uint8_t id);
 
   std::shared_ptr<QTimer> getTimer(QTcpSocket* connection);
 
@@ -29,12 +51,15 @@ Q_SIGNALS:
   void rejected(QTcpSocket* connection);
 
 private:
+  EnterAction _enter;
+  ExitAction _exit;
   QByteArray _toSend;
   QByteArray _toReceive;
 };
 
-HandshakeState::HandshakeState(QByteArray send, QByteArray receive)
-    : QObject(), _toSend(send), _toReceive(receive)
+HandshakeState::HandshakeState(EnterAction enter, ExitAction exit, QByteArray send,
+                               QByteArray receive)
+    : QObject(), _enter(enter), _exit(exit), _toSend(send), _toReceive(receive)
 {
 }
 
@@ -48,7 +73,7 @@ std::shared_ptr<QTimer> HandshakeState::getTimer(QTcpSocket* connection)
   return timer;
 }
 
-void HandshakeState::startWithWait(QTcpSocket* connection, uint8_t id)
+void HandshakeState::doCompare(QTcpSocket* connection, uint8_t id)
 {
   auto timer = getTimer(connection);
   connect(connection, &QTcpSocket::readyRead, this, [this, connection, id, timer]() {
@@ -63,29 +88,7 @@ void HandshakeState::startWithWait(QTcpSocket* connection, uint8_t id)
   });
 }
 
-void HandshakeState::startWithSend(QTcpSocket* connection, uint8_t id)
-{
-  auto timer = getTimer(connection);
-  connect(connection, &QTcpSocket::readyRead, this, [this, connection, id, timer]() {
-    disconnect(connection, &QTcpSocket::readyRead, this, nullptr);
-    disconnect(timer.get());
-    auto bytesRead = connection->readAll();
-    if (bytesRead != _toReceive) {
-      Q_EMIT rejected(connection);
-      return;
-    }
-    Q_EMIT accepted(connection, id);
-  });
-  connection->write(_toSend);
-}
-
-void HandshakeState::sendonly(QTcpSocket* connection, uint8_t id)
-{
-  Q_UNUSED(id)
-  connection->write(_toSend);
-}
-
-void HandshakeState::startWithSendForID(QTcpSocket* connection, uint8_t id)
+void HandshakeState::doId(QTcpSocket* connection, uint8_t id)
 {
   auto timer = getTimer(connection);
   connect(connection, &QTcpSocket::readyRead, this, [this, connection, id, timer]() {
@@ -98,23 +101,36 @@ void HandshakeState::startWithSendForID(QTcpSocket* connection, uint8_t id)
     }
     Q_EMIT accepted(connection, id);
   });
-  connection->write(_toSend);
 }
 
-void HandshakeState::startWithSendId(QTcpSocket* connection, uint8_t id)
+void HandshakeState::start(QTcpSocket* connection, uint8_t id)
 {
-  auto timer = getTimer(connection);
-  connect(connection, &QTcpSocket::readyRead, this, [this, connection, id, timer]() {
-    disconnect(connection, &QTcpSocket::readyRead, this, nullptr);
-    disconnect(timer.get());
-    auto bytesRead = connection->readAll();
-    if (bytesRead != _toReceive) {
-      Q_EMIT rejected(connection);
-      return;
-    }
+  // Establish connections first, send message later, else we might miss a response.
+  switch (_exit) {
+  case ExitAction::CompareMessage: {
+    doCompare(connection, id);
+  } break;
+  case ExitAction::ExpectId: {
+    doId(connection, id);
+  } break;
+  case ExitAction::Empty:
+    break;
+  };
+
+  switch (_enter) {
+  case EnterAction::SendMessage:
+    connection->write(_toSend);
+    break;
+  case EnterAction::SendId:
+    connection->write(QByteArray{1, static_cast<char>(id)});
+    break;
+  case EnterAction::Empty:
+    break;
+  };
+
+  if (_exit == ExitAction::Empty) {
     Q_EMIT accepted(connection, id);
-  });
-  connection->write(QByteArray{1, static_cast<char>(id)});
+  }
 }
 
 } // namespace
@@ -125,12 +141,17 @@ Handshaker::Handshaker(Type connectionType) : QObject(), _connectionType(connect
 {
   switch (_connectionType) {
   case Type::Generator: {
-    auto state1 = std::make_shared<HandshakeState>("", ::names[Type::Broker_in]);
-    auto state2 = std::make_shared<HandshakeState>(::names[Type::Generator], ::acceptMessage);
-    auto state3 = std::make_shared<HandshakeState>("", ::acceptMessage);
-    connect(state1.get(), &HandshakeState::accepted, state2.get(), &HandshakeState::startWithWait);
-    connect(state2.get(), &HandshakeState::accepted, state3.get(),
-            &HandshakeState::startWithSendId);
+    auto state1 = std::make_shared<HandshakeState>(HandshakeState::EnterAction::Empty,
+                                                   HandshakeState::ExitAction::CompareMessage, "",
+                                                   ::names[Type::Broker_in]);
+    auto state2 = std::make_shared<HandshakeState>(HandshakeState::EnterAction::SendMessage,
+                                                   HandshakeState::ExitAction::CompareMessage,
+                                                   ::names[Type::Generator], ::acceptMessage);
+    auto state3 = std::make_shared<HandshakeState>(HandshakeState::EnterAction::SendId,
+                                                   HandshakeState::ExitAction::CompareMessage, "",
+                                                   ::acceptMessage);
+    connect(state1.get(), &HandshakeState::accepted, state2.get(), &HandshakeState::start);
+    connect(state2.get(), &HandshakeState::accepted, state3.get(), &HandshakeState::start);
     connect(state3.get(), &HandshakeState::accepted, this, &Handshaker::accepted);
     connect(state1.get(), &::HandshakeState::rejected, this, &Handshaker::rejected);
     connect(state2.get(), &::HandshakeState::rejected, this, &Handshaker::rejected);
@@ -138,16 +159,21 @@ Handshaker::Handshaker(Type connectionType) : QObject(), _connectionType(connect
     _statemachine.push_back(state1);
     _statemachine.push_back(state2);
     _statemachine.push_back(state3);
-    _starter = std::bind(&HandshakeState::startWithWait, state1.get(), std::placeholders::_1,
+    _starter = std::bind(&HandshakeState::start, state1.get(), std::placeholders::_1,
                          std::placeholders::_2);
   } break;
   case Type::Client: {
-    auto state1 = std::make_shared<HandshakeState>("", ::names[Type::Broker_out]);
-    auto state2 = std::make_shared<HandshakeState>(::names[Type::Client], ::acceptMessage);
-    auto state3 = std::make_shared<HandshakeState>("", ::acceptMessage);
-    connect(state1.get(), &HandshakeState::accepted, state2.get(), &HandshakeState::startWithWait);
-    connect(state2.get(), &HandshakeState::accepted, state3.get(),
-            &HandshakeState::startWithSendId);
+    auto state1 = std::make_shared<HandshakeState>(HandshakeState::EnterAction::Empty,
+                                                   HandshakeState::ExitAction::CompareMessage, "",
+                                                   ::names[Type::Broker_out]);
+    auto state2 = std::make_shared<HandshakeState>(HandshakeState::EnterAction::SendMessage,
+                                                   HandshakeState::ExitAction::CompareMessage,
+                                                   ::names[Type::Client], ::acceptMessage);
+    auto state3 = std::make_shared<HandshakeState>(HandshakeState::EnterAction::SendId,
+                                                   HandshakeState::ExitAction::CompareMessage, "",
+                                                   ::acceptMessage);
+    connect(state1.get(), &HandshakeState::accepted, state2.get(), &HandshakeState::start);
+    connect(state2.get(), &HandshakeState::accepted, state3.get(), &HandshakeState::start);
     connect(state3.get(), &HandshakeState::accepted, this, &Handshaker::accepted);
     connect(state1.get(), &::HandshakeState::rejected, this, &Handshaker::rejected);
     connect(state2.get(), &::HandshakeState::rejected, this, &Handshaker::rejected);
@@ -155,17 +181,21 @@ Handshaker::Handshaker(Type connectionType) : QObject(), _connectionType(connect
     _statemachine.push_back(state1);
     _statemachine.push_back(state2);
     _statemachine.push_back(state3);
-    _starter = std::bind(&HandshakeState::startWithWait, state1.get(), std::placeholders::_1,
+    _starter = std::bind(&HandshakeState::start, state1.get(), std::placeholders::_1,
                          std::placeholders::_2);
   } break;
   case Type::Broker_in: {
-    auto state1 =
-        std::make_shared<HandshakeState>(::names[Type::Broker_in], ::names[Type::Generator]);
-    auto state2 = std::make_shared<HandshakeState>(::acceptMessage, "");
-    auto state3 = std::make_shared<HandshakeState>(::acceptMessage, "");
-    connect(state1.get(), &HandshakeState::accepted, state2.get(),
-            &HandshakeState::startWithSendForID);
-    connect(state2.get(), &HandshakeState::accepted, state3.get(), &HandshakeState::sendonly);
+    auto state1 = std::make_shared<HandshakeState>(
+        HandshakeState::EnterAction::SendMessage, HandshakeState::ExitAction::CompareMessage,
+        ::names[Type::Broker_in], ::names[Type::Generator]);
+    auto state2 =
+        std::make_shared<HandshakeState>(HandshakeState::EnterAction::SendMessage,
+                                         HandshakeState::ExitAction::ExpectId, ::acceptMessage, "");
+    auto state3 =
+        std::make_shared<HandshakeState>(HandshakeState::EnterAction::SendMessage,
+                                         HandshakeState::ExitAction::Empty, ::acceptMessage, "");
+    connect(state1.get(), &HandshakeState::accepted, state2.get(), &HandshakeState::start);
+    connect(state2.get(), &HandshakeState::accepted, state3.get(), &HandshakeState::start);
     connect(state3.get(), &HandshakeState::accepted, this, &Handshaker::accepted);
     connect(state1.get(), &::HandshakeState::rejected, this, &Handshaker::rejected);
     connect(state2.get(), &::HandshakeState::rejected, this, &Handshaker::rejected);
@@ -173,17 +203,21 @@ Handshaker::Handshaker(Type connectionType) : QObject(), _connectionType(connect
     _statemachine.push_back(state1);
     _statemachine.push_back(state2);
     _statemachine.push_back(state3);
-    _starter = std::bind(&HandshakeState::startWithSend, state1.get(), std::placeholders::_1,
+    _starter = std::bind(&HandshakeState::start, state1.get(), std::placeholders::_1,
                          std::placeholders::_2);
   } break;
   case Type::Broker_out: {
-    auto state1 =
-        std::make_shared<HandshakeState>(::names[Type::Broker_out], ::names[Type::Client]);
-    auto state2 = std::make_shared<HandshakeState>(::acceptMessage, "");
-    auto state3 = std::make_shared<HandshakeState>(::acceptMessage, "");
-    connect(state1.get(), &HandshakeState::accepted, state2.get(),
-            &HandshakeState::startWithSendForID);
-    connect(state2.get(), &HandshakeState::accepted, state3.get(), &HandshakeState::sendonly);
+    auto state1 = std::make_shared<HandshakeState>(
+        HandshakeState::EnterAction::SendMessage, HandshakeState::ExitAction::CompareMessage,
+        ::names[Type::Broker_out], ::names[Type::Client]);
+    auto state2 =
+        std::make_shared<HandshakeState>(HandshakeState::EnterAction::SendMessage,
+                                         HandshakeState::ExitAction::ExpectId, ::acceptMessage, "");
+    auto state3 =
+        std::make_shared<HandshakeState>(HandshakeState::EnterAction::SendMessage,
+                                         HandshakeState::ExitAction::Empty, ::acceptMessage, "");
+    connect(state1.get(), &HandshakeState::accepted, state2.get(), &HandshakeState::start);
+    connect(state2.get(), &HandshakeState::accepted, state3.get(), &HandshakeState::start);
     connect(state3.get(), &HandshakeState::accepted, this, &Handshaker::accepted);
     connect(state1.get(), &::HandshakeState::rejected, this, &Handshaker::rejected);
     connect(state2.get(), &::HandshakeState::rejected, this, &Handshaker::rejected);
@@ -191,7 +225,7 @@ Handshaker::Handshaker(Type connectionType) : QObject(), _connectionType(connect
     _statemachine.push_back(state1);
     _statemachine.push_back(state2);
     _statemachine.push_back(state3);
-    _starter = std::bind(&HandshakeState::startWithSend, state1.get(), std::placeholders::_1,
+    _starter = std::bind(&HandshakeState::start, state1.get(), std::placeholders::_1,
                          std::placeholders::_2);
   } break;
   }

@@ -45,7 +45,7 @@ void Client::worker()
   qDebug() << connection->readAll();
 }
 
-void Client::connected() { handshaker->shakeHands(connection.get()); }
+void Client::connected() { handshaker->shakeHands(connection.get(), event_id); }
 
 void Client::disconnected()
 {
