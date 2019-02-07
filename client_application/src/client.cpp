@@ -5,7 +5,7 @@
 
 namespace EventDemo {
 
-Client::Client(const QString& serverUrl, qint16 port, int id, QObject* parent)
+Client::Client(const QString& serverUrl, qint16 port, uint8_t id, QObject* parent)
     : QObject(parent), _id(id)
 {
   _handshaker = std::make_unique<Handshaker>(Handshaker::Type::Client);
@@ -29,7 +29,7 @@ void Client::subscribe(const QString& serverUrl, qint16 port)
   if (!_connection->waitForConnected(5000)) {
     qWarning() << "Error connecting to socket: " << _connection->errorString();
     _connection->deleteLater();
-    QCoreApplication::exit(1);
+    qApp->quit();
     exit(1);
   }
 }

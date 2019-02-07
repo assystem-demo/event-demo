@@ -1,21 +1,26 @@
-#include <QCoreApplication>
-
 #include "client.hpp"
+#include "ConnectionDefinitions.hpp"
+
+#include <QCoreApplication>
+#include <QCommandLineParser>
 
 int main(int argc, char** argv)
 {
   QCoreApplication app(argc, argv);
   QStringList args = app.arguments();
 
-  if (args.count() != 4) {
-      qWarning() << "Received an invalid number of arguments ... closing the application";
-      qWarning() << "Usage:";
-      qWarning() << "application serverUrl serverPort eventId";
-      return 1;
-  }
+  QCommandLineParser parser;
+  parser.setApplicationDescription("Event Client");
+  parser.addHelpOption();
+  parser.addOptions({
+                        {{"i", "eventId"},
+                         QCoreApplication::translate("main", "Provide a an <eventId>"),
+                         QCoreApplication::translate("main", "eventId")},
+                    });
 
-  //just a test
-  EventDemo::Client client(args[1], args[2].toInt(), args[3].toInt());
+  parser.process(app);
+
+  EventDemo::Client client(EventDemo::address.toString(), EventDemo::clientPort, parser.value("eventId").toInt());
 
   return app.exec();
 }

@@ -28,7 +28,7 @@ public:
    * \param id the id of the event to subscribe on the broker
    * \param parent qt object parent
    */
-  explicit Client(const QString& serverUrl, qint16 port, int id, QObject* parent = 0);
+  explicit Client(const QString& serverUrl, qint16 port, uint8_t id, QObject* parent = 0);
 
 public Q_SLOTS:
     /*!
