@@ -7,4 +7,8 @@ if [ "$#" -ne 1 ]; then
   exit 1
 fi
 
-docker build --build-arg EXECUTABLE_PATH=$1 -t assystem-demo .
+cp $1 .
+filename=$(basename $1)
+echo $filename
+docker build --build-arg EXECUTABLE_PATH=$filename -t assystem-demo .
+rm $filename
