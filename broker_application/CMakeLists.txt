@@ -2,6 +2,7 @@ project(event-broker)
 
 add_executable(${PROJECT_NAME}
   inc/broker.hpp
+  src/broker.cpp
   inc/clientside.hpp
   src/clientside.cpp
   inc/generatorside.hpp
