@@ -1,14 +1,26 @@
 #!/bin/bash
 
-if [ "$#" -ne 1 ]; then
+if [ "$#" -ne 4 ]; then
   echo "wrong number of arguments!"
   echo "usage:"
-  echo "./buildImage path/to/exec/to/copy"
+  echo "./buildImage clientPath generatorPath brokerPath imageName"
   exit 1
 fi
 
-cp $1 .
-filename=$(basename $1)
-echo $filename
-docker build --build-arg EXECUTABLE_PATH=$filename -t assystem-demo .
-rm $filename
+clientPath=$1
+generatorPath=$2
+brokerPath=$3
+name=$4
+
+cp "$clientPath" .
+cp "$generatorPath" .
+cp "$brokerPath" .
+client=$(basename "$clientPath")
+broker=$(basename "$brokerPath")
+generator=$(basename "$generatorPath")
+
+docker build --build-arg CLIENT_PATH="$client" GENERATOR_PATH="$generator" BROKER_PATH="$broker" -t "$4" .
+rm "$client"
+rm "$broker"
+rm "$generator"
+

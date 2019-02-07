@@ -16,7 +16,9 @@
 
 FROM ubuntu:18.04
 
-ARG EXECUTABLE_PATH
+ARG CLIENT_PATH
+ARG BROKER_PATH
+ARG GENERATOR_PATH
 
 RUN apt-get update && \
     apt-get install -y \
@@ -25,5 +27,7 @@ RUN apt-get update && \
     cmake
 
 
-COPY $EXECUTABLE_PATH /usr/bin
+COPY $CLIENT_PATH /usr/bin
+COPY $BROKER_PATH /usr/bin
+COPY $GENERATOR_PATH /usr/bin
 
