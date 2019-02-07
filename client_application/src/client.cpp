@@ -9,8 +9,8 @@ Client::Client(const QString& serverUrl, qint16 port, int id, QObject* parent)
 {
   _handshaker = std::make_unique<Handshaker>(Handshaker::Type::Client);
 
-  connect(_handshaker.get(), SIGNAL(accepted(QTcpSocket*, uint8_t)), this, SLOT(onAccepted()));
-  connect(_handshaker.get(), SIGNAL(rejected(QTcpSocket*)), this, SLOT(onRejected()));
+  connect(_handshaker.get(), &Handshaker::accepted, this, &Client::onAccepted);
+  connect(_handshaker.get(), &Handshaker::rejected, this, &Client::onRejected);
 
   subscribe(serverUrl, port);
 }
@@ -19,9 +19,9 @@ void Client::subscribe(const QString& serverUrl, qint16 port)
 {
   _connection = std::make_unique<QTcpSocket>(this);
 
-  connect(_connection.get(), SIGNAL(connected()), this, SLOT(onConnected()));
-  connect(_connection.get(), SIGNAL(disconnected()), this, SLOT(onDisconnected()));
-  connect(_connection.get(), SIGNAL(readyRead()), this, SLOT(onMessageReceived()));
+  connect(_connection.get(), &QTcpSocket::connected, this, &Client::onConnected);
+  connect(_connection.get(), &QTcpSocket::disconnected, this, &Client::onDisconnected);
+  connect(_connection.get(), &QTcpSocket::readyRead, this, &Client::onMessageReceived);
 
   _connection->connectToHost(serverUrl, port);
 
