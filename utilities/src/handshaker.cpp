@@ -70,6 +70,8 @@ std::shared_ptr<QTimer> HandshakeState::getTimer(QTcpSocket* connection)
     disconnect(connection, &QTcpSocket::readyRead, this, nullptr);
     Q_EMIT rejected(connection);
   });
+  timer->setInterval(std::chrono::milliseconds(500));
+  timer->start();
   return timer;
 }
 
