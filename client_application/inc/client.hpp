@@ -26,9 +26,9 @@ private:
   void subscribe(const QString& server_url, qint16 port);
 
 private:
-  std::unique_ptr<Handshaker> handshaker;
-  std::unique_ptr<QTcpSocket> connection;
-  uint8_t event_id;
+  std::unique_ptr<Handshaker> _handshaker;
+  std::unique_ptr<QTcpSocket> _connection;
+  uint8_t _event_id;
 };
 
 } // namespace EventDemo
