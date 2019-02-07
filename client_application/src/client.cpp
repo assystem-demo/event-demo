@@ -5,15 +5,12 @@
 
 namespace EventDemo {
 
-Client::Client(const QString& serverUrl, qint16 port, uint8_t id, QObject* parent)
-    : QObject(parent), _id(id)
+Client::Client(uint8_t id, QObject* parent) : QObject(parent), _id(id)
 {
   _handshaker = std::make_unique<Handshaker>(Handshaker::Type::Client);
 
   connect(_handshaker.get(), &Handshaker::accepted, this, &Client::onAccepted);
   connect(_handshaker.get(), &Handshaker::rejected, this, &Client::onRejected);
-
-  subscribe(serverUrl, port);
 }
 
 void Client::subscribe(const QString& serverUrl, qint16 port)
@@ -22,19 +19,21 @@ void Client::subscribe(const QString& serverUrl, qint16 port)
 
   connect(_connection.get(), &QTcpSocket::connected, this, &Client::onConnected);
   connect(_connection.get(), &QTcpSocket::disconnected, this, &Client::onDisconnected);
-  connect(_connection.get(), &QTcpSocket::readyRead, this, &Client::onMessageReceived);
 
   _connection->connectToHost(serverUrl, port);
 
   if (!_connection->waitForConnected(5000)) {
     qWarning() << "Error connecting to socket: " << _connection->errorString();
     _connection->deleteLater();
-    qApp->quit();
     exit(1);
   }
 }
 
-void Client::onAccepted() { qInfo() << "connection established and accepted"; }
+void Client::onAccepted()
+{
+  qInfo() << "connection established and accepted";
+  connect(_connection.get(), &QTcpSocket::readyRead, this, &Client::onMessageReceived);
+}
 
 void Client::onRejected()
 {
@@ -55,7 +54,6 @@ void Client::onDisconnected()
 {
   qInfo() << "disconnected...";
   _connection->deleteLater();
-  QCoreApplication::exit(1);
   exit(1);
 }
 

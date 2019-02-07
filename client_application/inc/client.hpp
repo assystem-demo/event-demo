@@ -21,20 +21,18 @@ class Client : public QObject
 {
   Q_OBJECT
 public:
-    /*!
-   * \brief Constructor
-   * \param serverUrl an url or ip address to a TCP server
-   * \param port a port for connecting to a TCP server
-   * \param id the id of the event to subscribe on the broker
-   * \param parent qt object parent
-   */
-  explicit Client(const QString& serverUrl, qint16 port, uint8_t id, QObject* parent = 0);
+  /*!
+ * \brief Constructor
+ * \param id the id of the event to subscribe on the broker
+ * \param parent qt object parent
+ */
+  explicit Client(uint8_t id, QObject* parent = 0);
 
 public Q_SLOTS:
-    /*!
-   * \brief This slot will be called once a TCP connection is established.
-   * This will invoke the handshaker in order to approve the connection.
-   */
+  /*!
+ * \brief This slot will be called once a TCP connection is established.
+ * This will invoke the handshaker in order to approve the connection.
+ */
   void onConnected();
 
   /*!
@@ -55,12 +53,12 @@ public Q_SLOTS:
   void onRejected();
 
   /*!
-   * \brief This slot will be called when a new message was sent over TCP, which is ready to be read.
+   * \brief This slot will be called when a new message was sent over TCP, which is ready to be
+   * read.
    * Once received the message will be printed with a timestamp.
    */
   void onMessageReceived();
 
-private:
   /*!
    * \brief This function will start a connection to the given port and ip.
    * \param serverUrl url or ip to a TCP server.
@@ -68,6 +66,7 @@ private:
    */
   void subscribe(const QString& server_url, qint16 port);
 
+private:
   std::unique_ptr<Handshaker> _handshaker;
   std::unique_ptr<QTcpSocket> _connection;
   uint8_t _id;
