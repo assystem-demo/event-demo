@@ -1,5 +1,6 @@
 #include "client.hpp"
 
+#include <QCoreApplication>
 #include <QDate>
 
 namespace EventDemo {
@@ -28,6 +29,8 @@ void Client::subscribe(const QString& serverUrl, qint16 port)
   if (!_connection->waitForConnected(5000)) {
     qWarning() << "Error connecting to socket: " << _connection->errorString();
     _connection->deleteLater();
+    QCoreApplication::exit(1);
+    exit(1);
   }
 }
 
@@ -52,6 +55,8 @@ void Client::onDisconnected()
 {
   qInfo() << "disconnected...";
   _connection->deleteLater();
+  QCoreApplication::exit(1);
+  exit(1);
 }
 
 } // namespace EventDemo
