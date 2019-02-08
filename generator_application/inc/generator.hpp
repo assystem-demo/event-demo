@@ -28,7 +28,7 @@ public:
    * \param hostAddress the address of the broker,
    * \param interval the time interval for the events in ms.
    */
-  void start(QHostAddress hostAddress, int interval);
+  void start(QString hostAddress, int interval);
 
 private:
   void nowConnected();

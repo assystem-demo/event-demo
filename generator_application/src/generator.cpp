@@ -12,7 +12,7 @@ Generator::Generator(uint8_t event_id) : _event_id(event_id)
   _tcpConnection = std::unique_ptr<QTcpSocket>(new QTcpSocket);
 }
 
-void Generator::start(QHostAddress hostAddress, int interval)
+void Generator::start(QString hostAddress, int interval)
 {
   // make connections to TCP events
   connect(_tcpConnection.get(), &QTcpSocket::connected, this, &Generator::nowConnected);

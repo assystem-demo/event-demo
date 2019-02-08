@@ -29,7 +29,7 @@ int main(int argc, char** argv)
   EventDemo::Generator generator(parser.value("eventId").toInt());
 
   QTimer::singleShot(0, &generator, [&parser, &generator]() {
-    generator.start(QHostAddress{parser.value("address")}, parser.value("timer-interval").toInt());
+    generator.start(parser.value("address"), parser.value("timer-interval").toInt());
   });
   return app.exec();
 }
