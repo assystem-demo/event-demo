@@ -53,10 +53,6 @@ void GeneratorSide::onConnectionClosed(uint8_t id)
   _generators.erase(element);
 }
 
-void GeneratorSide::onEvent(uint8_t id)
-{
-  qInfo() << QTime::currentTime().toString() << "Event" << static_cast<unsigned int>(id);
-  Q_EMIT event(id);
-}
+void GeneratorSide::onEvent(uint8_t id) { Q_EMIT event(id); }
 
 } // namespace EventDemo

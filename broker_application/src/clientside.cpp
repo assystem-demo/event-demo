@@ -35,9 +35,9 @@ void ClientSide::onConnectionDetected()
 
 void ClientSide::onConnectionAccepted(QTcpSocket* connection, uint8_t id)
 {
-  auto clientList = _clients[id];
+  auto& clientList = _clients[id];
   clientList.push_back(connection);
-  qInfo() << "Connection established to client listening for signal"
+  qInfo() << clientList.size() << "client(s) now listening for signal"
           << static_cast<unsigned int>(id);
   connect(connection, &QTcpSocket::disconnected, this,
           [this, connection, id]() { onConnectionClosed(connection, id); });
@@ -45,12 +45,15 @@ void ClientSide::onConnectionAccepted(QTcpSocket* connection, uint8_t id)
 
 void ClientSide::onEvent(uint8_t id)
 {
+  qInfo() << QTime::currentTime().toString() << "| BROKER | Event" << static_cast<unsigned int>(id);
   auto clientList = _clients.find(id);
   if (clientList == _clients.end()) {
     return;
   }
-  std::for_each(std::begin(clientList->second), std::end(clientList->second),
-                [](auto client) { client->write("\x88"); });
+  std::for_each(std::begin(clientList->second), std::end(clientList->second), [](auto client) {
+    client->write("\x88");
+    client->flush();
+  });
 }
 
 void ClientSide::onConnectionClosed(QTcpSocket* connection, uint8_t id)
