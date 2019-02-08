@@ -1,4 +1,6 @@
 #include "handshaker.hpp"
+
+#include <QtCore/QDebug>
 #include <QtCore/QTimer>
 #include <QtNetwork/QTcpSocket>
 
@@ -79,10 +81,15 @@ void HandshakeState::doCompare(QTcpSocket* connection, uint8_t id)
 {
   auto timer = getTimer(connection);
   connect(connection, &QTcpSocket::readyRead, this, [this, connection, id, timer]() {
+    auto bytesRead = connection->readAll();
+    if (bytesRead.isEmpty()) {
+      return;
+    }
     disconnect(connection, &QTcpSocket::readyRead, this, nullptr);
     disconnect(timer.get());
-    auto bytesRead = connection->readAll();
     if (bytesRead != _toReceive) {
+      qWarning() << "Rejected connection: unexpected message" << bytesRead
+                 << "vs expected:" << _toReceive;
       Q_EMIT rejected(connection);
       return;
     }
@@ -97,11 +104,12 @@ void HandshakeState::doId(QTcpSocket* connection, uint8_t id)
     disconnect(connection, &QTcpSocket::readyRead, this, nullptr);
     disconnect(timer.get());
     auto bytesRead = connection->readAll();
-    if (bytesRead != QByteArray{1, static_cast<char>(id)}) {
+    if (id != 0xFF && bytesRead != QByteArray{1, static_cast<char>(id)}) {
+      qInfo() << "Rejected connection, bad id";
       Q_EMIT rejected(connection);
       return;
     }
-    Q_EMIT accepted(connection, id);
+    Q_EMIT accepted(connection, static_cast<uint8_t>(bytesRead[0]));
   });
 }
 
@@ -122,9 +130,11 @@ void HandshakeState::start(QTcpSocket* connection, uint8_t id)
   switch (_enter) {
   case EnterAction::SendMessage:
     connection->write(_toSend);
+    connection->flush();
     break;
   case EnterAction::SendId:
     connection->write(QByteArray{1, static_cast<char>(id)});
+    connection->flush();
     break;
   case EnterAction::Empty:
     break;

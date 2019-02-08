@@ -1,7 +1,9 @@
 #include "client.hpp"
+#include "ConnectionDefinitions.hpp"
 
 #include <QCoreApplication>
 #include <QDate>
+#include <QtCore/QCoreApplication>
 
 namespace EventDemo {
 
@@ -19,13 +21,11 @@ void Client::subscribe(const QString& serverUrl, qint16 port)
 
   connect(_connection.get(), &QTcpSocket::connected, this, &Client::onConnected);
   connect(_connection.get(), &QTcpSocket::disconnected, this, &Client::onDisconnected);
-
-  _connection->connectToHost(serverUrl, port);
+  _connection->connectToHost(address, clientPort);
 
   if (!_connection->waitForConnected(5000)) {
     qWarning() << "Error connecting to socket: " << _connection->errorString();
-    _connection->deleteLater();
-    exit(1);
+    qApp->quit();
   }
 }
 
@@ -43,9 +43,7 @@ void Client::onRejected()
 
 void Client::onMessageReceived()
 {
-  qInfo() << "received event";
-  qInfo() << QDate::currentDate().toString();
-  qInfo() << _connection->readAll();
+  qInfo() << "received event" << QDate::currentDate().toString() << _connection->readAll();
 }
 
 void Client::onConnected() { _handshaker->shakeHands(_connection.get(), _id); }
@@ -53,8 +51,7 @@ void Client::onConnected() { _handshaker->shakeHands(_connection.get(), _id); }
 void Client::onDisconnected()
 {
   qInfo() << "disconnected...";
-  _connection->deleteLater();
-  exit(1);
+  qApp->quit();
 }
 
 } // namespace EventDemo

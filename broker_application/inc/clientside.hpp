@@ -16,6 +16,7 @@ class ClientSide : public QObject
 
 public:
   ClientSide() = default;
+  ~ClientSide();
 
   /*!
    * \brief Start listening for clients.
@@ -33,8 +34,9 @@ public:
 private:
   void onConnectionDetected();
   void onConnectionAccepted(QTcpSocket* connection, uint8_t id);
+  void onConnectionClosed(QTcpSocket* connection, uint8_t id);
 
-  std::map<uint8_t, std::vector<std::shared_ptr<QTcpSocket>>> _clients;
+  std::map<uint8_t, std::vector<QTcpSocket*>> _clients;
   std::unique_ptr<QTcpServer> _server;
   Handshaker handshaker{Handshaker::Type::Broker_out};
 };

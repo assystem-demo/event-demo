@@ -16,7 +16,7 @@ class GeneratorSide : public QObject
 
 public:
   GeneratorSide() = default;
-
+  ~GeneratorSide();
   /*!
    * \brief Start listening for generators.
    *
@@ -30,10 +30,11 @@ Q_SIGNALS:
 private:
   void onConnectionDetected();
   void onConnectionAccepted(QTcpSocket* connection, uint8_t id);
+  void onConnectionClosed(uint8_t id);
 
   void onEvent(uint8_t id);
 
-  std::map<uint8_t, std::shared_ptr<QTcpSocket>> _generators;
+  std::map<uint8_t, QTcpSocket*> _generators;
   std::unique_ptr<QTcpServer> _server;
   Handshaker handshaker{Handshaker::Type::Broker_in};
 };
