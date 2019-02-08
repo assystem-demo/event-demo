@@ -19,7 +19,7 @@ client=$(basename "$clientPath")
 broker=$(basename "$brokerPath")
 generator=$(basename "$generatorPath")
 
-docker build --build-arg CLIENT_PATH="$client" GENERATOR_PATH="$generator" BROKER_PATH="$broker" -t "$4" .
+docker build --build-arg CLIENT_PATH="$client" --build-arg GENERATOR_PATH="$generator" --build-arg BROKER_PATH="$broker" -t "$4" .
 rm "$client"
 rm "$broker"
 rm "$generator"

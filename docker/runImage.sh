@@ -14,6 +14,6 @@ echo "cleaning existing docker container"
 docker stop "$name" > /dev/null
 docker rm "$name" > /dev/null
 
-docker run --name "$name" --net demo-net "$image"
+docker create -it --name "$name" --net demo-net "$image" /bin/bash
 
 docker start "$name" > /dev/null
